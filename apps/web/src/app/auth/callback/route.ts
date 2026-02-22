@@ -3,6 +3,7 @@ import { exchangeCodeForTokens, fetchUserProfile } from '@/lib/oauth/google';
 import { cookies } from 'next/headers';
 import { db, users } from '@wf/db';
 import { eq } from 'drizzle-orm';
+import { createSession, signCookie } from '@wf/auth';
 
 /**
  * GET /auth/callback
@@ -11,7 +12,7 @@ import { eq } from 'drizzle-orm';
  * - Exchanges authorization code for tokens
  * - Fetches user profile
  * - Creates or finds user in database
- * - Creates session (stubbed for now - Task 2.5)
+ * - Creates session with signed cookie
  * - Redirects to dashboard
  */
 export async function GET(request: NextRequest) {
@@ -121,18 +122,43 @@ export async function GET(request: NextRequest) {
         .where(eq(users.id, user.id));
     }
 
-    // TODO: Create session (Task 2.5)
-    // For now, just set a temporary cookie to indicate authentication
-    cookieStore.set('temp_user_id', user.id, {
+    // Get tenant ID from middleware-injected headers
+    const tenantId = request.headers.get('X-Tenant-Id');
+
+    if (!tenantId) {
+      console.error('Missing tenant ID from middleware headers');
+      return NextResponse.redirect(
+        new URL('/login?error=missing_tenant', request.url)
+      );
+    }
+
+    // Create session with metadata
+    const sessionSigningSecret = process.env.SESSION_SIGNING_SECRET;
+    if (!sessionSigningSecret) {
+      console.error('Missing SESSION_SIGNING_SECRET');
+      return NextResponse.redirect(
+        new URL('/login?error=configuration_error', request.url)
+      );
+    }
+
+    const { token } = await createSession(user.id, tenantId, {
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+    });
+
+    // Sign the session token cookie
+    const signedToken = signCookie(token, sessionSigningSecret);
+
+    // Set httpOnly cookie with signed session token
+    cookieStore.set('session', signedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 14, // 14 days
+      maxAge: 60 * 60 * 24 * 14, // 14 days (matches SESSION_DURATION_MS)
       path: '/',
     });
 
     // Redirect to dashboard
-    // TODO: Redirect to tenant-specific dashboard once tenant resolution is implemented
     return NextResponse.redirect(new URL('/dashboard', request.url));
   } catch (error) {
     console.error('Error in OAuth callback:', error);
