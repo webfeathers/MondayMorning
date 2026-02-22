@@ -28,7 +28,6 @@ coverage/
 *.sublime-*
 
 # Database
-drizzle/
 *.db
 *.db-journal
 
