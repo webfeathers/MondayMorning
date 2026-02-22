@@ -2,3 +2,4 @@
 export * from './session';
 export * from './session-management';
 export * from './permissions';
+export * from './invitations';
