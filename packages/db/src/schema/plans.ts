@@ -13,7 +13,12 @@ export const plans = pgTable('plans', {
     webhookSync: boolean;
     whiteLabel: boolean;
     apiAccess: boolean;
-  }>().notNull().default({}),
+  }>().notNull().default({
+    configurableDashboards: false,
+    webhookSync: false,
+    whiteLabel: false,
+    apiAccess: false,
+  }),
   pricePerSeatMonthly: numeric('price_per_seat_monthly'),
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
