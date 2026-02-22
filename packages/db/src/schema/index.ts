@@ -2,3 +2,8 @@ export * from './tenants';
 export * from './users';
 export * from './tenant-members';
 export * from './sessions';
+export * from './organizations';
+export * from './deals';
+export * from './tickets';
+export * from './contacts';
+export * from './meetings';
