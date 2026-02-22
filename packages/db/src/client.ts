@@ -2,6 +2,9 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
+// Export DB type for use in other packages
+export type DB = ReturnType<typeof drizzle<typeof schema>>;
+
 /**
  * Base database client factory
  * Returns a raw Drizzle instance without tenant isolation
