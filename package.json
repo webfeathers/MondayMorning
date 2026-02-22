@@ -1,0 +1,21 @@
+{
+  "name": "wf",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "db:generate": "turbo db:generate --filter=@wf/db",
+    "db:migrate": "turbo db:migrate --filter=@wf/db",
+    "db:seed": "turbo db:seed --filter=@wf/db"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

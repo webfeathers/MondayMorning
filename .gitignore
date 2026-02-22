@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env*.local
+
+# Testing
+coverage/
+.vitest/
+
+# Misc
+.DS_Store
+*.log
+*.swp
+.turbo/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Database
+drizzle/
+*.db
+*.db-journal
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
