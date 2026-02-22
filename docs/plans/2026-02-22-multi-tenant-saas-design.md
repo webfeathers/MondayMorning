@@ -85,7 +85,7 @@ All three services share `packages/*` (Node services) and communicate via REST A
 
 - **ORM:** Drizzle (type-safe, SQL-like, lightweight)
 - **Hosting:** Supabase for now, but `packages/db` has zero Supabase-specific imports — any managed Postgres works
-- **RLS:** Safety net using Postgres session variables (`SET app.current_tenant_id`), not the primary isolation mechanism
+- **RLS:** Safety net using Postgres session variables (`SET LOCAL app.current_tenant_id` within transaction blocks), not the primary isolation mechanism. `SET LOCAL` (not `SET`) ensures the variable is scoped to the current transaction only, preventing leaks in PgBouncer/Supavisor transaction-mode connection pools.
 - **Primary isolation:** Drizzle middleware automatically appends `WHERE tenant_id = ?` to every query
 
 ---
@@ -195,8 +195,11 @@ tenant_custom_field_definitions
   field_type      text            -- 'text', 'number', 'date', 'select', 'boolean'
   options         jsonb (nullable)-- for select fields: ["Inbound", "Outbound"]
   source_mapping  text (nullable) -- 'LeadSource' in SF, 'hs_analytics_source' in HS
+  mapping_status  text DEFAULT 'pending' -- 'pending', 'active', 'reindexing'
   sort_order      integer
 ```
+
+**Immutable mappings:** Once a `source_mapping` is `active`, changing it requires setting `mapping_status` to `reindexing`, triggering a full re-sync to rebuild `custom_fields` data, then transitioning back to `active`. This prevents data corruption in JSONB columns from mid-stream mapping changes.
 
 Populated during integration onboarding via schema discovery. The adapter proposes default mappings from CRM fields, tenant admin reviews on a "smart defaults + review" screen.
 
@@ -211,7 +214,11 @@ stage_mappings
   source_value      text            -- 'Closed Won', 'closedwon'
   normalized_value  text            -- 'won', 'lost', 'negotiation'
   display_label     text            -- "Closed Won" (what tenant sees)
+  is_closed         boolean DEFAULT false  -- true for terminal stages
+  is_won            boolean DEFAULT false  -- true for won stages (subset of closed)
 ```
+
+The `is_closed` and `is_won` booleans allow dashboard queries like `WHERE is_won = true` regardless of CRM terminology ("Closed Won", "Contract Signed", "Finished").
 
 ### Soft Deletes & Sync Policy
 
@@ -517,21 +524,33 @@ The AI service is a pure function: **config + context in → analysis out.** It 
 ### Execution Flow
 
 ```
-apps/web (API route)                      apps/ai-service
-  │                                         │
-  ├── 1. Receive request                    │
-  ├── 2. Check entitlements + credits       │
-  ├── 3. Assemble context from normalized   │
-  │      tables (CRM-agnostic payload)      │
-  ├── 4. Load crew config (template +       │
-  │      tenant overrides, deep merged)     │
-  ├── 5. POST to ai-service ──────────────→ │
-  │      { crew_type, config, context }     ├── 6. Execute crew
-  │                                         │      (no DB, no CRM knowledge)
-  │◄──────────────────────────────────────── ├── 7. Return results
-  ├── 8. Store in crew_analyses             │
-  └── 9. Update credit usage                │
+apps/web (API route)           apps/worker              apps/ai-service
+  │                              │                        │
+  ├── 1. Receive request         │                        │
+  ├── 2. Check entitlements      │                        │
+  ├── 3. Estimate context size   │                        │
+  │      (reject if too large    │                        │
+  │       or over credit budget) │                        │
+  ├── 4. Assemble + prune context│                        │
+  ├── 5. Load crew config        │                        │
+  ├── 6. Enqueue ai_job ────────→│                        │
+  │      Return job_id to client │                        │
+  │                              ├── 7. Pick up job       │
+  │                              ├── 8. POST to ai-svc ──→│
+  │                              │                        ├── 9. Execute crew
+  │                              │◄───────────────────────├── 10. Return results
+  │                              ├── 11. Store results    │
+  │                              ├── 12. Update credits   │
+  │                              └── 13. Notify user      │
+  │                                                       │
+  └── Client polls/subscribes for completion              │
 ```
+
+**Async-always execution:** Every crew run goes through the job queue. The web app returns a `job_id` immediately. The client polls for completion (or subscribes via SSE). This avoids Vercel function timeouts and provides consistent UX regardless of crew complexity.
+
+**Pre-execution guardrails:**
+- **Context size estimation:** Before enqueuing, estimate token count from assembled context. Reject if context exceeds model window or would cost more credits than the tenant has remaining.
+- **Context pruning:** Each `crew_template` defines `max_context` limits (e.g., max 20 deals, 10 most recent meetings). The context assembler enforces these budgets to control AI COGS.
 
 ### Orchestration Interface
 
@@ -562,6 +581,7 @@ crew_templates
   default_config      jsonb           -- agents, tasks, prompts, model
   required_context    text[]          -- ['organization', 'deals', 'tickets']
   required_integrations text[]        -- ['crm'] or ['crm', 'meeting']
+  max_context         jsonb           -- { deals: 20, meetings: 10, tickets: 30 } pruning limits
   credit_cost         integer DEFAULT 1
   min_plan            text
   version             integer
@@ -826,6 +846,7 @@ job_schedules
 - **Processor** loops continuously, pulls jobs with `FOR UPDATE SKIP LOCKED`
 - **Per-tenant concurrency limit** (default: 2 concurrent jobs per tenant)
 - **Priority system:** webhook (10) > user-initiated (5) > scheduled (1) > bulk (0)
+- **CRM API quota awareness:** When a tenant is near their CRM's daily API limit, auto-defer background syncs (priority 0-1) and only execute user-initiated syncs (priority 5+). The adapter's `checkQuotaRemaining()` is called before each sync job.
 - **Retry:** Exponential backoff, max 3 attempts, then fail + notify
 - **Stall detection:** Jobs running > 15 minutes auto-reset
 
@@ -1092,15 +1113,52 @@ API routes under `/api/v1/` with API key auth middleware.
 RLS policies use Postgres session variables, not Supabase auth context:
 
 ```sql
--- Set at start of each request by Drizzle middleware
-SET app.current_tenant_id = 'tenant-uuid';
+-- Set at start of each request by Drizzle middleware (inside a transaction)
+BEGIN;
+SET LOCAL app.current_tenant_id = 'tenant-uuid';
+-- ... all queries run here ...
+COMMIT;
 
 -- RLS policy
 CREATE POLICY tenant_isolation ON deals
   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 ```
 
-This ensures RLS works as a safety net even though Drizzle (not the Supabase client) is the primary data access layer.
+**Critical:** Use `SET LOCAL` (not `SET`) to scope the session variable to the current transaction only. This prevents tenant_id leaking between requests when using PgBouncer/Supavisor in transaction pooling mode.
+
+### Seat Enforcement (Database-Level)
+
+In addition to UI-level seat checks, enforce seat limits at the database level:
+
+```sql
+CREATE OR REPLACE FUNCTION enforce_seat_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+  current_count integer;
+  seat_limit integer;
+BEGIN
+  SELECT count(*) INTO current_count
+  FROM tenant_members
+  WHERE tenant_id = NEW.tenant_id AND status IN ('active', 'invited');
+
+  SELECT ts.seat_count INTO seat_limit
+  FROM tenant_subscriptions ts
+  WHERE ts.tenant_id = NEW.tenant_id AND ts.status IN ('active', 'trialing');
+
+  IF current_count >= seat_limit THEN
+    RAISE EXCEPTION 'Seat limit reached (% of %)', current_count, seat_limit;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_seat_limit
+  BEFORE INSERT ON tenant_members
+  FOR EACH ROW EXECUTE FUNCTION enforce_seat_limit();
+```
+
+This prevents over-provisioning even if the UI has a bug or is bypassed via API.
 
 ---
 
