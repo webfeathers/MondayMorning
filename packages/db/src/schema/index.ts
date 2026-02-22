@@ -7,3 +7,7 @@ export * from './deals';
 export * from './tickets';
 export * from './contacts';
 export * from './meetings';
+export * from './integration-connections';
+export * from './custom-field-definitions';
+export * from './stage-mappings';
+export * from './sync-events';
