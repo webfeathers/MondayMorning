@@ -5,10 +5,10 @@ import { cookies } from 'next/headers';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const { token } = params;
+    const { token } = await params;
 
     if (!token) {
       return NextResponse.json(
@@ -56,7 +56,7 @@ export async function POST(
     );
 
     // 5. Set session cookie
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.set('session', newSession.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

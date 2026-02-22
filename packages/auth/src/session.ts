@@ -65,3 +65,18 @@ export function verifyCookie(signedValue: string, secret: string): string | null
 
   return value;
 }
+
+/**
+ * Unsigns a signed cookie and extracts the original value
+ * @param signedValue - The signed cookie value
+ * @param secret - The secret key used for signing
+ * @returns The original value if valid
+ * @throws Error if verification fails
+ */
+export function unsignCookie(signedValue: string, secret: string): string {
+  const value = verifyCookie(signedValue, secret);
+  if (!value) {
+    throw new Error('Invalid cookie signature');
+  }
+  return value;
+}
