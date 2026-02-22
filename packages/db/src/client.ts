@@ -17,3 +17,23 @@ export function createBaseClient() {
 
   return { db, sql };
 }
+
+// Singleton database instance for non-tenant-specific operations
+// (e.g., authentication, user lookup)
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+export function getDb() {
+  if (!_db) {
+    const { db } = createBaseClient();
+    _db = db;
+  }
+  return _db;
+}
+
+// Lazy getter for db to avoid initialization during build
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get(_target, prop) {
+    const realDb = getDb();
+    return (realDb as any)[prop];
+  },
+});

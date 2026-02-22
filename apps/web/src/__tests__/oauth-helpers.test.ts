@@ -22,7 +22,8 @@ describe('Google OAuth Helpers', () => {
       expect(url).toContain(`client_id=${clientId}`);
       expect(url).toContain(`redirect_uri=${encodeURIComponent(redirectUri)}`);
       expect(url).toContain('response_type=code');
-      expect(url).toContain('scope=openid%20email%20profile');
+      // URL encoding can use either + or %20 for spaces
+      expect(url).toMatch(/scope=(openid(\+|%20)email(\+|%20)profile|openid%20email%20profile)/);
       expect(url).toContain(`state=${state}`);
     });
   });
