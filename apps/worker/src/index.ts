@@ -5,6 +5,10 @@ import { startProcessor, stopProcessor, registerJobHandler } from './processor/j
 import { startScheduler, stopScheduler } from './scheduler/job-scheduler';
 import { startStallDetection, stopStallDetection } from './processor/stall-detection';
 import { syncCRMJobHandler } from './jobs/sync-crm-job';
+import { provisionTenantJobHandler } from './jobs/provision-tenant-job';
+import { suspendTenantJobHandler } from './jobs/suspend-tenant-job';
+import { reactivateTenantJobHandler } from './jobs/reactivate-tenant-job';
+import { purgeTenantJobHandler } from './jobs/purge-tenant-job';
 import { circuitBreakerRegistry } from './processor/circuit-breaker';
 import { quotaManager } from './processor/quota-manager';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -68,7 +72,11 @@ console.log('Job processor initialized and started');
 
 // Register job handlers
 registerJobHandler('sync_crm', syncCRMJobHandler);
-console.log('Registered job handlers: sync_crm');
+registerJobHandler('provision_tenant', provisionTenantJobHandler);
+registerJobHandler('suspend_tenant', suspendTenantJobHandler);
+registerJobHandler('reactivate_tenant', reactivateTenantJobHandler);
+registerJobHandler('purge_tenant', purgeTenantJobHandler);
+console.log('Registered job handlers: sync_crm, provision_tenant, suspend_tenant, reactivate_tenant, purge_tenant');
 
 // Start job scheduler (check every minute by default)
 const checkInterval = process.env.SCHEDULER_CHECK_INTERVAL
