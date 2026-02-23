@@ -64,3 +64,26 @@ export {
   syncTickets,
 } from './core/sync-engine';
 export type { SyncResult as SyncEngineResult } from './core/sync-engine';
+
+// Connection manager
+export {
+  createConnection,
+  getConnection,
+  refreshConnection,
+  testConnection,
+  listConnections,
+  deleteConnection,
+  updateSyncState,
+} from './core/connection-manager';
+
+// Encryption utilities
+export {
+  encryptCredentials,
+  decryptCredentials,
+} from './core/encryption';
+
+// Provider registry
+export {
+  getProviderType,
+  getAdapter,
+} from './core/provider-registry';
