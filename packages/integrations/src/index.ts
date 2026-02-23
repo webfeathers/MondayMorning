@@ -86,6 +86,7 @@ export {
 export {
   getProviderType,
   getAdapter,
+  getAdapter as getProvider, // Alias for convenience
   registerProvider,
   listProviders,
   getProviderMetadata,
