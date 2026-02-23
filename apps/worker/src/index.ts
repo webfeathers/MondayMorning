@@ -3,6 +3,7 @@ import { hostname } from 'os';
 import { randomUUID } from 'crypto';
 import { startProcessor, stopProcessor } from './processor/job-processor';
 import { startScheduler, stopScheduler } from './scheduler/job-scheduler';
+import { startStallDetection, stopStallDetection } from './processor/stall-detection';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@wf/db';
@@ -67,6 +68,13 @@ const checkInterval = process.env.SCHEDULER_CHECK_INTERVAL
 startScheduler(db, checkInterval);
 console.log(`Job scheduler started (checking every ${checkInterval}ms)`);
 
+// Start stall detection (check every minute by default)
+const stallCheckInterval = process.env.STALL_CHECK_INTERVAL
+  ? parseInt(process.env.STALL_CHECK_INTERVAL)
+  : 60000;
+startStallDetection(stallCheckInterval);
+console.log(`Stall detection started (checking every ${stallCheckInterval}ms)`);
+
 // Graceful shutdown handling
 const gracefulShutdown = (signal: string) => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
@@ -74,6 +82,10 @@ const gracefulShutdown = (signal: string) => {
   // Stop job scheduler first
   console.log('Stopping job scheduler...');
   stopScheduler();
+
+  // Stop stall detection
+  console.log('Stopping stall detection...');
+  stopStallDetection();
 
   // Stop job processor
   console.log('Stopping job processor...');
