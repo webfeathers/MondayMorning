@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
 import { hostname } from 'os';
 import { randomUUID } from 'crypto';
-import { startProcessor, stopProcessor } from './processor/job-processor';
+import { startProcessor, stopProcessor, registerJobHandler } from './processor/job-processor';
 import { startScheduler, stopScheduler } from './scheduler/job-scheduler';
 import { startStallDetection, stopStallDetection } from './processor/stall-detection';
+import { syncCRMJobHandler } from './jobs/sync-crm-job';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@wf/db';
@@ -60,6 +61,10 @@ console.log('Database connection established');
 // Start job processor
 const processor = startProcessor(WORKER_ID, 1000);
 console.log('Job processor initialized and started');
+
+// Register job handlers
+registerJobHandler('sync_crm', syncCRMJobHandler);
+console.log('Registered job handlers: sync_crm');
 
 // Start job scheduler (check every minute by default)
 const checkInterval = process.env.SCHEDULER_CHECK_INTERVAL
