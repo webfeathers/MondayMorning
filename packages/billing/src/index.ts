@@ -1,5 +1,5 @@
 // Billing package entry point
-// Will export Stripe client, entitlement checks, and credit system
+// Exports Stripe client, entitlement checks, and credit system
 
 export * from './stripe/client';
 export * from './stripe/types';
@@ -8,3 +8,4 @@ export * from './stripe/tenant-provisioning';
 export * from './stripe/webhook-handler';
 export * from './entitlements/check-entitlements';
 export * from './entitlements/features';
+export * from './credits/credit-manager';
