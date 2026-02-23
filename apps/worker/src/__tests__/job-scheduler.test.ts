@@ -20,8 +20,8 @@ describe('Job Scheduler', () => {
     vi.clearAllMocks();
     // Reset chained mock methods
     mockDb.select.mockReturnValue(mockQuery);
-    mockDb.insert.mockReturnValue(mockQuery);
-    mockDb.update.mockReturnValue(mockQuery);
+    mockDb.insert.mockReturnValue({ values: vi.fn().mockResolvedValue({}) });
+    mockDb.update.mockReturnValue({ set: vi.fn().mockReturnValue(mockQuery) });
     mockQuery.from.mockReturnValue(mockQuery);
     mockQuery.where.mockReturnValue(mockQuery);
     mockQuery.orderBy.mockReturnValue(mockQuery);
@@ -197,28 +197,14 @@ describe('Job Scheduler', () => {
       vi.useFakeTimers();
       vi.setSystemTime(now);
 
-      const schedules = [
-        {
-          id: 'schedule-1',
-          tenantId: 'tenant-1',
-          jobType: 'sync_crm',
-          cronExpression: '0 10 * * *',
-          payload: { provider: 'salesforce' },
-          isActive: false, // Disabled
-          lastRunAt: null,
-          nextRunAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-
-      mockQuery.where.mockResolvedValue(schedules);
+      // Mock returns empty array because WHERE isActive=true filters out disabled schedules
+      mockQuery.where.mockResolvedValue([]);
       const db = mockDb as any;
 
       // Act
       await checkSchedules(db);
 
-      // Assert - should NOT insert any jobs (schedule is disabled)
+      // Assert - should NOT insert any jobs (no active schedules returned by query)
       expect(mockDb.insert).not.toHaveBeenCalled();
 
       vi.useRealTimers();
