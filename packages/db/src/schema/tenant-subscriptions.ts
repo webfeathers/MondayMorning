@@ -7,8 +7,10 @@ export const tenantSubscriptions = pgTable('tenant_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   planId: uuid('plan_id').notNull().references(() => plans.id),
+  scheduledPlanId: uuid('scheduled_plan_id').references(() => plans.id), // For downgrades scheduled at period end
   stripeSubscriptionId: text('stripe_subscription_id'),
   stripeCustomerId: text('stripe_customer_id'),
+  stripeSubscriptionScheduleId: text('stripe_subscription_schedule_id'), // For tracking scheduled changes
   status: text('status').notNull(), // active, trialing, past_due, canceled, unpaid
   seatCount: integer('seat_count').notNull().default(1),
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true, mode: 'date' }),
