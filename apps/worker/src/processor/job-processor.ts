@@ -1,7 +1,8 @@
 import { db, jobs } from '@wf/db';
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, lte, or, isNull } from 'drizzle-orm';
 import { JobStatus, MAX_CONCURRENT_JOBS_PER_TENANT } from '@wf/shared';
 import type { JobContext, JobPayload } from '../types/job';
+import { calculateNextRetryTime, shouldRetryJob } from './retry-engine';
 
 /**
  * Job handler function type
@@ -43,10 +44,20 @@ export class JobProcessor {
       // Use a transaction to claim a job atomically with FOR UPDATE SKIP LOCKED
       const result = await db.transaction(async (tx) => {
         // First, get the next queued job (ordered by priority DESC, createdAt ASC)
+        // Only select jobs that are ready to run (scheduledFor is null or <= now)
+        const now = new Date();
         const [nextJob] = await tx
           .select()
           .from(jobs)
-          .where(eq(jobs.status, JobStatus.QUEUED))
+          .where(
+            and(
+              eq(jobs.status, JobStatus.QUEUED),
+              or(
+                isNull(jobs.scheduledFor),
+                lte(jobs.scheduledFor, now)
+              )
+            )
+          )
           .orderBy(desc(jobs.priority), asc(jobs.createdAt))
           .limit(1)
           .for('update', { skipLocked: true });
@@ -140,24 +151,42 @@ export class JobProcessor {
     } catch (error) {
       console.error(`Job ${job.id} failed:`, error);
 
-      // Mark job as failed
+      // Check if job should be retried
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const status = job.attempts >= job.maxAttempts ? JobStatus.FAILED : JobStatus.QUEUED;
+      const canRetry = shouldRetryJob(job.attempts, job.maxAttempts);
 
-      await db
-        .update(jobs)
-        .set({
-          status,
-          error: errorMessage,
-          updatedAt: new Date(),
-          ...(status === JobStatus.FAILED ? { completedAt: new Date() } : {}),
-        })
-        .where(eq(jobs.id, job.id));
+      if (canRetry) {
+        // Calculate next retry time with exponential backoff
+        const nextRetryTime = calculateNextRetryTime(job.attempts);
 
-      if (status === JobStatus.FAILED) {
-        console.log(`Job ${job.id} marked as failed after ${job.attempts} attempts`);
+        await db
+          .update(jobs)
+          .set({
+            status: JobStatus.QUEUED,
+            error: errorMessage,
+            scheduledFor: nextRetryTime,
+            updatedAt: new Date(),
+          })
+          .where(eq(jobs.id, job.id));
+
+        const delaySeconds = Math.floor((nextRetryTime.getTime() - Date.now()) / 1000);
+        console.log(
+          `Job ${job.id} will be retried in ~${delaySeconds}s ` +
+          `(attempt ${job.attempts}/${job.maxAttempts})`
+        );
       } else {
-        console.log(`Job ${job.id} will be retried (attempt ${job.attempts}/${job.maxAttempts})`);
+        // Mark job as permanently failed
+        await db
+          .update(jobs)
+          .set({
+            status: JobStatus.FAILED,
+            error: errorMessage,
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(jobs.id, job.id));
+
+        console.log(`Job ${job.id} marked as failed after ${job.attempts} attempts`);
       }
     }
   }

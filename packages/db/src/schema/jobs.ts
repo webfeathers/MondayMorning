@@ -12,6 +12,7 @@ export const jobs = pgTable('jobs', {
   error: text('error'),
   attempts: integer('attempts').notNull().default(0),
   maxAttempts: integer('max_attempts').notNull().default(3),
+  scheduledFor: timestamp('scheduled_for', { withTimezone: true, mode: 'date' }), // For delayed execution and exponential backoff
   lockedBy: text('locked_by'), // worker instance ID
   lockedAt: timestamp('locked_at', { withTimezone: true, mode: 'date' }),
   completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
