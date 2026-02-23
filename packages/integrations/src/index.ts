@@ -33,3 +33,25 @@ export type {
 
 // Adapters
 export { MockCRMAdapter } from './adapters/mock-crm-adapter';
+
+// Field mapper pipeline
+export {
+  mapFields,
+  coerceValue,
+  applyTransform,
+  normalizeStage,
+  validateRecord,
+  extractCustomFields,
+} from './core/field-mapper';
+export type {
+  ValidationResult,
+  StageNormalizationResult,
+} from './core/field-mapper';
+
+// Transformation registry
+export {
+  registerTransform,
+  getTransform,
+  listTransforms,
+} from './core/transformations';
+export type { TransformFunction } from './core/transformations';
