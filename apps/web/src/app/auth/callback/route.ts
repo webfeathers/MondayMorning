@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens, fetchUserProfile } from '@/lib/oauth/google';
 import { cookies } from 'next/headers';
-import { db, users } from '@wf/db';
-import { eq } from 'drizzle-orm';
+import { db, users, tenants, tenantMembers } from '@wf/db';
+import { eq, and } from 'drizzle-orm';
 import { createSession, signCookie } from '@wf/auth';
+import { provisionTenant } from '@wf/billing';
 
 /**
  * GET /auth/callback
@@ -130,6 +131,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(
         new URL('/login?error=missing_tenant', request.url)
       );
+    }
+
+    // Check if this is a new tenant (no existing members means new tenant needing provisioning)
+    const existingMember = await db.query.tenantMembers.findFirst({
+      where: eq(tenantMembers.tenantId, tenantId),
+    });
+
+    // If this is a new tenant (first member), provision billing
+    if (!existingMember) {
+      try {
+        // Get tenant details for provisioning
+        const tenant = await db.query.tenants.findFirst({
+          where: eq(tenants.id, tenantId),
+        });
+
+        if (tenant) {
+          // Provision tenant with Stripe customer and trial subscription
+          await provisionTenant(
+            tenant.id,
+            tenant.name,
+            profile.email, // Owner email
+            'pro' // Default to Pro plan with 14-day trial
+          );
+
+          console.log('Tenant provisioned successfully:', {
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+          });
+        }
+      } catch (provisionError) {
+        // Log error but don't block signup - billing can be fixed later
+        console.error('Error provisioning tenant:', provisionError);
+        // Could add a flag to tenant or send alert to admin
+      }
     }
 
     // Create session with metadata

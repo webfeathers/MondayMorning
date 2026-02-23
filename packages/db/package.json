@@ -16,10 +16,6 @@
     "postgres": "^3.4.0",
     "@wf/shared": "workspace:*"
   },
-  "optionalDependencies": {
-    "@wf/billing": "workspace:*",
-    "stripe": "^17.5.0"
-  },
   "devDependencies": {
     "drizzle-kit": "^0.30.0",
     "vitest": "^3.0.0",
