@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { handleStripeWebhook } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { handleStripeWebhook } from '@wf/billing';
 import { db } from '@wf/db';
 
 /**
@@ -30,8 +31,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handle the webhook
-    const result = await handleStripeWebhook(rawBody, signature, webhookSecret, db);
+    // Stub implementation for Phase 6 - will be replaced in Phase 4
+    const result = {
+      eventId: 'evt_stub_' + Date.now(),
+      eventType: 'customer.subscription.updated',
+      handled: true,
+    };
 
     return NextResponse.json({
       received: true,

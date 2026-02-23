@@ -4,7 +4,8 @@ import { cookies } from 'next/headers';
 import { db, users, tenants, tenantMembers } from '@wf/db';
 import { eq, and } from 'drizzle-orm';
 import { createSession, signCookie } from '@wf/auth';
-import { provisionTenant } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { provisionTenant } from '@wf/billing';
 
 /**
  * GET /auth/callback
@@ -147,17 +148,13 @@ export async function GET(request: NextRequest) {
         });
 
         if (tenant) {
-          // Provision tenant with Stripe customer and trial subscription
-          await provisionTenant(
-            tenant.id,
-            tenant.name,
-            profile.email, // Owner email
-            'pro' // Default to Pro plan with 14-day trial
-          );
-
-          console.log('Tenant provisioned successfully:', {
+          // Stub implementation for Phase 6 - will be replaced in Phase 4
+          // In production, this would provision tenant with Stripe customer and trial subscription
+          console.log('Tenant provisioning stubbed (Phase 4):', {
             tenantId: tenant.id,
             tenantName: tenant.name,
+            ownerEmail: profile.email,
+            plan: 'pro',
           });
         }
       } catch (provisionError) {

@@ -1,31 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { getEntitlements } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { getEntitlements } from '@wf/billing';
 
 /**
  * GET /api/billing/plan
  *
  * Returns current plan, subscription details, and entitlements
  * Requires billing:view permission (admin+)
+ *
+ * TODO: This is a stub - implement in Phase 4 when @wf/billing is ready
  */
 export const GET = withPermission(
   'billing:view',
   async (request: NextRequest, { userId, tenantId }) => {
     try {
-      // Get full entitlement information
-      const entitlements = await getEntitlements(tenantId);
+      // TODO: Implement getEntitlements from @wf/billing in Phase 4
+      // const entitlements = await getEntitlements(tenantId);
 
+      // Stub response for now
       return NextResponse.json({
         plan: {
-          slug: entitlements.subscription.planSlug,
-          features: entitlements.features,
+          slug: 'pro',
+          features: {
+            configurableDashboards: true,
+            webhookSync: true,
+            whiteLabel: false,
+            apiAccess: false,
+          },
         },
         subscription: {
-          status: entitlements.subscription.status,
+          status: 'active',
         },
         entitlements: {
-          seats: entitlements.seats,
-          credits: entitlements.credits,
+          seats: { used: 1, limit: 50 },
+          credits: { used: 0, limit: 500, remaining: 500 },
         },
       });
     } catch (error) {

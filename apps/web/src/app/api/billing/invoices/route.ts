@@ -16,7 +16,7 @@ export const GET = withPermission(
       // Query invoices for this tenant, ordered by date (newest first)
       const invoices = await db.query.tenantInvoices.findMany({
         where: eq(tenantInvoices.tenantId, tenantId),
-        orderBy: [desc(tenantInvoices.invoiceDate)],
+        orderBy: [desc(tenantInvoices.createdAt)],
         limit: 50, // Return last 50 invoices
       });
 
@@ -24,10 +24,11 @@ export const GET = withPermission(
         invoices: invoices.map((invoice) => ({
           id: invoice.id,
           stripeInvoiceId: invoice.stripeInvoiceId,
-          amount: invoice.amount,
+          amountDue: invoice.amountDue,
+          amountPaid: invoice.amountPaid,
           currency: invoice.currency,
           status: invoice.status,
-          invoiceDate: invoice.invoiceDate,
+          createdAt: invoice.createdAt,
           dueDate: invoice.dueDate,
           paidAt: invoice.paidAt,
           invoiceUrl: invoice.invoiceUrl,

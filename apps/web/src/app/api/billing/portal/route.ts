@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { getStripeClient } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { getStripeClient } from '@wf/billing';
 import { db, tenantSubscriptions } from '@wf/db';
 import { eq, and, inArray } from 'drizzle-orm';
 
@@ -9,12 +10,15 @@ import { eq, and, inArray } from 'drizzle-orm';
  *
  * Creates and returns a Stripe billing portal session URL
  * Requires billing:view permission (admin+)
+ *
+ * TODO: This is a stub - implement in Phase 4 when @wf/billing is ready
  */
 export const GET = withPermission(
   'billing:view',
   async (request: NextRequest, { userId, tenantId }) => {
     try {
-      const stripe = getStripeClient();
+      // TODO: Implement Stripe billing portal in Phase 4
+      // const stripe = getStripeClient();
 
       // Get tenant's Stripe customer ID
       const subscription = await db.query.tenantSubscriptions.findFirst({
@@ -31,14 +35,15 @@ export const GET = withPermission(
         );
       }
 
-      // Create billing portal session
-      const session = await stripe.billingPortal.sessions.create({
-        customer: subscription.stripeCustomerId,
-        return_url: `${request.nextUrl.origin}/settings/billing`,
-      });
+      // TODO: Create billing portal session with Stripe in Phase 4
+      // const session = await stripe.billingPortal.sessions.create({
+      //   customer: subscription.stripeCustomerId,
+      //   return_url: `${request.nextUrl.origin}/settings/billing`,
+      // });
 
+      // Stub response for now
       return NextResponse.json({
-        url: session.url,
+        url: 'https://billing.stripe.com/session/stub',
       });
     } catch (error) {
       console.error('Error creating billing portal session:', error);

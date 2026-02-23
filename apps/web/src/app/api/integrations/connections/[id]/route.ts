@@ -20,9 +20,12 @@ import {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15+
+    const { id } = await params;
+
     // 1. Validate session
     const session = await getSession();
     if (!session) {
@@ -42,7 +45,7 @@ export async function GET(
     }
 
     // 3. Get connection using connection manager
-    const connection = await getConnectionManager(params.id);
+    const connection = await getConnectionManager(id);
 
     if (!connection) {
       return NextResponse.json(
@@ -101,9 +104,12 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15+
+    const { id } = await params;
+
     // 1. Validate session
     const session = await getSession();
     if (!session) {
@@ -139,7 +145,7 @@ export async function DELETE(
     }
 
     // 4. Verify connection exists and belongs to tenant before deleting
-    const connection = await getConnectionManager(params.id);
+    const connection = await getConnectionManager(id);
     if (!connection || connection.tenantId !== tenant.id) {
       return NextResponse.json(
         { error: 'Connection not found' },
@@ -148,7 +154,7 @@ export async function DELETE(
     }
 
     // 5. Delete connection using connection manager
-    const result = await deleteConnectionManager(params.id);
+    const result = await deleteConnectionManager(id);
 
     if (!result.success) {
       return NextResponse.json(

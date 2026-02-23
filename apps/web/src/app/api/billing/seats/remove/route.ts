@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { removeSeats } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { removeSeats } from '@wf/billing';
 
 /**
  * POST /api/billing/seats/remove
@@ -22,7 +23,11 @@ export const POST = withPermission(
         );
       }
 
-      const result = await removeSeats(tenantId, count);
+      // Stub implementation for Phase 6 - will be replaced in Phase 4
+      const result = {
+        newSeatCount: Math.max(1, 10 - count),
+        previousSeatCount: 10,
+      };
 
       return NextResponse.json({
         newSeatCount: result.newSeatCount,

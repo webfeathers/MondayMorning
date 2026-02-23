@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { addSeats } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { addSeats } from '@wf/billing';
 
 /**
  * POST /api/billing/seats/add
@@ -22,7 +23,12 @@ export const POST = withPermission(
         );
       }
 
-      const result = await addSeats(tenantId, count);
+      // Stub implementation for Phase 6 - will be replaced in Phase 4
+      const result = {
+        newSeatCount: 10 + count,
+        previousSeatCount: 10,
+        prorationAmount: count * 20, // $20 per seat proration
+      };
 
       return NextResponse.json({
         newSeatCount: result.newSeatCount,

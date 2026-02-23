@@ -21,9 +21,12 @@ import {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15+
+    const { id } = await params;
+
     // 1. Validate session
     const session = await getSession();
     if (!session) {
@@ -43,7 +46,7 @@ export async function POST(
     }
 
     // 3. Verify connection exists and belongs to tenant
-    const connection = await getConnectionManager(params.id);
+    const connection = await getConnectionManager(id);
     if (!connection || connection.tenantId !== tenant.id) {
       return NextResponse.json(
         { error: 'Connection not found' },
@@ -52,13 +55,13 @@ export async function POST(
     }
 
     // 4. Test connection using connection manager
-    const result = await testConnectionManager(params.id);
+    const result = await testConnectionManager(id);
 
     // 5. Return test result
     return NextResponse.json({
       success: result.success,
       error: result.error,
-      connectionId: params.id,
+      connectionId: id,
       providerName: connection.providerName,
       testedAt: new Date().toISOString(),
     });

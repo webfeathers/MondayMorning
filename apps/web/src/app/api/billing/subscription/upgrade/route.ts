@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { upgradeSubscription } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { upgradeSubscription } from '@wf/billing';
 
 /**
  * POST /api/billing/subscription/upgrade
@@ -22,7 +23,14 @@ export const POST = withPermission(
         );
       }
 
-      const result = await upgradeSubscription(tenantId, newPlanSlug);
+      // Stub implementation for Phase 6 - will be replaced in Phase 4
+      const result = {
+        success: true,
+        newPlanSlug,
+        prorationInvoiceId: 'in_stub_' + Date.now(),
+        prorationAmount: 150, // $150 proration
+        error: undefined as string | undefined,
+      };
 
       if (!result.success) {
         return NextResponse.json(

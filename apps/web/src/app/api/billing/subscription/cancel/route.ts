@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { cancelSubscription } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { cancelSubscription } from '@wf/billing';
 
 /**
  * POST /api/billing/subscription/cancel
@@ -15,7 +16,15 @@ export const POST = withPermission(
       const body = await request.json();
       const { immediately = false } = body;
 
-      const result = await cancelSubscription(tenantId, immediately);
+      // Stub implementation for Phase 6 - will be replaced in Phase 4
+      const result = {
+        success: true,
+        canceledImmediately: immediately,
+        effectiveAt: immediately
+          ? new Date().toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+        error: undefined as string | undefined,
+      };
 
       if (!result.success) {
         return NextResponse.json(

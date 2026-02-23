@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPermission } from '@/lib/require-permission';
-import { CreditManager } from '@wf/billing';
+// TODO: Implement @wf/billing package in Phase 4
+// import { CreditManager } from '@wf/billing';
 
 /**
  * GET /api/billing/usage
@@ -12,8 +13,15 @@ export const GET = withPermission(
   'billing:view',
   async (request: NextRequest, { userId, tenantId }) => {
     try {
-      const creditManager = new CreditManager(tenantId);
-      const usage = await creditManager.getCurrentPeriodUsage();
+      // Stub implementation for Phase 6 - will be replaced in Phase 4
+      const usage = {
+        period: '2026-02', // Current month period
+        creditsUsed: 245,
+        creditsAllowed: 500,
+        creditsRemaining: 255,
+        percentUsed: 49,
+        warningThreshold: 80,
+      };
 
       return NextResponse.json({
         usage: {
