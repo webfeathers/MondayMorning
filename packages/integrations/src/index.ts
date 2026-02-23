@@ -55,3 +55,12 @@ export {
   listTransforms,
 } from './core/transformations';
 export type { TransformFunction } from './core/transformations';
+
+// Sync engine
+export {
+  syncDeals,
+  syncAccounts,
+  syncContacts,
+  syncTickets,
+} from './core/sync-engine';
+export type { SyncResult as SyncEngineResult } from './core/sync-engine';
