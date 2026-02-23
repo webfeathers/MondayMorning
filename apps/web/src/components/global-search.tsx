@@ -46,13 +46,17 @@ interface SearchResult {
   href: string;
 }
 
+interface GlobalSearchProps {
+  defaultOpen?: boolean; // For testing
+}
+
 /**
  * GlobalSearch Component
  * Command palette style search (Cmd+K / Ctrl+K) across all entities
  */
-export function GlobalSearch() {
+export function GlobalSearch({ defaultOpen = false }: GlobalSearchProps = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
 
