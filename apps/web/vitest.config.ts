@@ -12,6 +12,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@wf/billing': path.resolve(__dirname, '../../packages/billing/src'),
+      '@wf/db': path.resolve(__dirname, '../../packages/db/src'),
+      '@wf/auth': path.resolve(__dirname, '../../packages/auth/src'),
+      '@wf/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
 });
