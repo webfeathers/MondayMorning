@@ -6,6 +6,7 @@ import { startScheduler, stopScheduler } from './scheduler/job-scheduler';
 import { startStallDetection, stopStallDetection } from './processor/stall-detection';
 import { syncCRMJobHandler } from './jobs/sync-crm-job';
 import { circuitBreakerRegistry } from './processor/circuit-breaker';
+import { quotaManager } from './processor/quota-manager';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@wf/db';
@@ -40,6 +41,7 @@ app.get('/metrics', (req: Request, res: Response) => {
       failed: 0,
     },
     circuitBreakers: circuitBreakerRegistry.getAllMetrics(),
+    quotaStatus: quotaManager.getAllStatuses(),
   });
 });
 

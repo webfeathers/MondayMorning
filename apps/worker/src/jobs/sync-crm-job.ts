@@ -36,6 +36,7 @@ import { eq, and } from 'drizzle-orm';
 import type { FieldMapping, StageMapping } from '@wf/integrations';
 import type { JobHandler } from '../processor/job-processor';
 import { getCircuitBreaker, CircuitBreakerOpenError } from '../processor/circuit-breaker';
+import { quotaManager, QuotaExhaustedError, QuotaLevel } from '../processor/quota-manager';
 
 /**
  * Job payload interface
@@ -148,14 +149,42 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
     const adapter = getAdapter(connection.providerName, connection.credentials);
     console.log(`[Job ${jobId}] Created adapter for ${connection.providerName}`);
 
-    // Step 3: Get circuit breaker for this provider
+    // Step 3: Check API quota before starting sync
+    console.log(`[Job ${jobId}] Checking API quota for ${connection.providerName}...`);
+    try {
+      const rateLimitStatus = await adapter.getRateLimitStatus();
+      const quotaCheck = quotaManager.checkQuota(connection.providerName, rateLimitStatus);
+
+      console.log(`[Job ${jobId}] Quota status: ${quotaCheck.message}`);
+
+      if (!quotaCheck.canProceed) {
+        throw new QuotaExhaustedError(
+          connection.providerName,
+          quotaCheck.status,
+          quotaCheck.waitUntil!
+        );
+      }
+
+      // Log warning if quota is low
+      if (quotaCheck.level === QuotaLevel.WARNING) {
+        console.warn(`[Job ${jobId}] ${quotaCheck.message}`);
+      }
+    } catch (error) {
+      if (error instanceof QuotaExhaustedError) {
+        throw error;
+      }
+      // If quota check fails, log warning but continue (quota check is not critical)
+      console.warn(`[Job ${jobId}] Failed to check quota: ${error}. Continuing anyway.`);
+    }
+
+    // Step 4: Get circuit breaker for this provider
     const circuitBreakerName = `crm:${connection.providerName}`;
     const circuitBreaker = getCircuitBreaker(circuitBreakerName);
     console.log(
       `[Job ${jobId}] Circuit breaker state: ${circuitBreaker.getState()}`
     );
 
-    // Step 4: Test connection health (with circuit breaker protection)
+    // Step 5: Test connection health (with circuit breaker protection)
     try {
       const isHealthy = await circuitBreaker.execute(() => adapter.testConnection());
       if (!isHealthy) {
@@ -171,7 +200,7 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
       throw error;
     }
 
-    // Step 5: Fetch stage mappings from database
+    // Step 6: Fetch stage mappings from database
     const client = await createClient();
     const db = drizzle(client, { schema });
 
@@ -195,10 +224,33 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
 
     console.log(`[Job ${jobId}] Found ${stageMappingsFormatted.length} stage mappings`);
 
-    // Step 6: Sync each entity type (with circuit breaker protection)
+    // Step 7: Sync each entity type (with circuit breaker and quota protection)
     const results: SyncCRMResult['results'] = [];
 
     for (const entity of entities) {
+      // Check quota before each entity sync
+      try {
+        const rateLimitStatus = await adapter.getRateLimitStatus();
+        const quotaCheck = quotaManager.checkQuota(connection.providerName, rateLimitStatus);
+
+        if (!quotaCheck.canProceed) {
+          throw new QuotaExhaustedError(
+            connection.providerName,
+            quotaCheck.status,
+            quotaCheck.waitUntil!
+          );
+        }
+
+        if (quotaCheck.level === QuotaLevel.WARNING) {
+          console.warn(`[Job ${jobId}] ${quotaCheck.message}`);
+        }
+      } catch (error) {
+        if (error instanceof QuotaExhaustedError) {
+          throw error;
+        }
+        console.warn(`[Job ${jobId}] Failed to check quota for ${entity}: ${error}`);
+      }
+
       console.log(`[Job ${jobId}] Syncing ${entity}...`);
 
       const syncOptions = {
@@ -297,7 +349,7 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
       );
     }
 
-    // Step 7: Update connection sync state
+    // Step 8: Update connection sync state
     await db
       .update(schema.integrationConnections)
       .set({

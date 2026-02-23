@@ -70,6 +70,12 @@ describe('Sync CRM Job Handler', () => {
 
   const mockAdapter = {
     testConnection: vi.fn().mockResolvedValue(true),
+    getRateLimitStatus: vi.fn().mockResolvedValue({
+      limit: 1000,
+      remaining: 500,
+      resetAt: new Date(Date.now() + 3600000).toISOString(),
+      percentUsed: 0.5,
+    }),
     syncDeals: vi.fn(),
     syncAccounts: vi.fn(),
     syncContacts: vi.fn(),
