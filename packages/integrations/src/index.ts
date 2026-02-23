@@ -4,5 +4,29 @@
 // Core CRM provider interface
 export type { CRMProvider } from './types/crm-provider';
 
-// Supporting types will be exported in Task 3.3
-// export type { ... } from './types/sync-types';
+// Supporting types
+export type {
+  // Authentication
+  AuthResult,
+  // Schema discovery
+  ObjectSchema,
+  FieldSchema,
+  ObjectMetadata,
+  // Sync operations
+  SyncOptions,
+  SyncResult,
+  // Raw record types
+  RawDeal,
+  RawAccount,
+  RawContact,
+  RawTicket,
+  // Field mapping
+  ValidationRule,
+  FieldMapping,
+  StageMapping,
+  // Rate limiting
+  RateLimitConfig,
+  RateLimitStatus,
+  // Webhooks
+  WebhookRegistration,
+} from './types/sync-types';
