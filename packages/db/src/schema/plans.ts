@@ -20,6 +20,8 @@ export const plans = pgTable('plans', {
     apiAccess: false,
   }),
   pricePerSeatMonthly: numeric('price_per_seat_monthly'),
+  stripeProductId: text('stripe_product_id'),
+  stripePriceId: text('stripe_price_id'),
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),

@@ -11,7 +11,9 @@
   "dependencies": {
     "stripe": "^17.5.0",
     "@wf/db": "workspace:*",
-    "@wf/shared": "workspace:*"
+    "@wf/shared": "workspace:*",
+    "drizzle-orm": "^0.38.0",
+    "postgres": "^3.4.0"
   },
   "devDependencies": {
     "vitest": "^3.0.0",

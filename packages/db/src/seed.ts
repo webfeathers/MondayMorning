@@ -363,6 +363,25 @@ async function seed() {
 
     console.log('✅ Permissions seeded (45 default permissions)');
 
+    // Sync plans to Stripe (if STRIPE_SECRET_KEY is set)
+    if (process.env.STRIPE_SECRET_KEY) {
+      console.log('\n💳 Syncing plans to Stripe...');
+      try {
+        const { syncPlansToStripe } = await import('@wf/billing');
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+          apiVersion: '2025-01-27.acacia',
+        });
+        await syncPlansToStripe(db, stripe);
+        console.log('✅ Plans synced to Stripe');
+      } catch (error) {
+        console.error('⚠️  Failed to sync plans to Stripe:', error);
+        console.log('   Continuing with seed...');
+      }
+    } else {
+      console.log('\n⚠️  STRIPE_SECRET_KEY not set, skipping Stripe plan sync');
+    }
+
     console.log('\n✨ Seed completed successfully!');
   } catch (error) {
     console.error('\n❌ Seed failed:', error);

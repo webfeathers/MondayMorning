@@ -3,3 +3,4 @@
 
 export * from './stripe/client';
 export * from './stripe/types';
+export * from './stripe/plan-sync';

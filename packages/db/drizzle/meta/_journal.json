@@ -15,6 +15,13 @@
       "when": 1771802315270,
       "tag": "0001_robust_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771860906456,
+      "tag": "0002_new_nightmare",
+      "breakpoints": true
     }
   ]
 }

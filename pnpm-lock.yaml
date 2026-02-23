@@ -143,6 +143,12 @@ importers:
       '@wf/shared':
         specifier: workspace:*
         version: link:../shared
+      drizzle-orm:
+        specifier: ^0.38.0
+        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.8
       stripe:
         specifier: ^17.5.0
         version: 17.7.0
@@ -156,6 +162,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@wf/billing':
+        specifier: workspace:*
+        version: link:../billing
       '@wf/shared':
         specifier: workspace:*
         version: link:../shared
@@ -165,6 +174,9 @@ importers:
       postgres:
         specifier: ^3.4.0
         version: 3.4.8
+      stripe:
+        specifier: ^17.5.0
+        version: 17.7.0
     devDependencies:
       drizzle-kit:
         specifier: ^0.30.0
