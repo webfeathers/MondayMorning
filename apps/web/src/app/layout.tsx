@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { TenantProvider } from '@/providers/tenant-provider';
+import { QueryProvider } from '@/providers/query-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -38,7 +39,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {content}
+        <QueryProvider>{content}</QueryProvider>
       </body>
     </html>
   );
