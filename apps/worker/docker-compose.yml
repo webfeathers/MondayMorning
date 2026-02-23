@@ -1,0 +1,90 @@
+# Docker Compose configuration for local worker development
+# Includes PostgreSQL database and worker service
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: wf-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: workflow_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wf-network
+
+  # Worker Service
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    container_name: wf-worker-dev
+    environment:
+      # Database
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workflow_dev
+
+      # Worker Configuration
+      WORKER_ID: worker-dev-1
+      PORT: 3001
+
+      # Job Scheduler
+      SCHEDULER_CHECK_INTERVAL: 60000  # 1 minute
+
+      # Stall Detection
+      STALL_CHECK_INTERVAL: 60000      # 1 minute
+      JOB_STALL_TIMEOUT_MS: 900000     # 15 minutes
+
+      # Retry Engine
+      RETRY_BASE_DELAY_MS: 5000        # 5 seconds
+      RETRY_MAX_DELAY_MS: 3600000      # 1 hour
+      RETRY_JITTER_MS: 1000            # 1 second
+
+      # Circuit Breaker
+      CB_FAILURE_THRESHOLD: 5          # failures before opening
+      CB_SUCCESS_THRESHOLD: 2          # successes to close
+      CB_TIMEOUT_MS: 60000             # 1 minute before half-open
+
+      # Quota Manager
+      QUOTA_WARNING_THRESHOLD: 0.25    # 25%
+      QUOTA_CRITICAL_THRESHOLD: 0.10   # 10%
+
+      # Node
+      NODE_ENV: development
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount source for hot reload in development
+      - ../../apps/worker/src:/app/apps/worker/src:ro
+      - ../../packages/db/src:/app/packages/db/src:ro
+      - ../../packages/integrations/src:/app/packages/integrations/src:ro
+    networks:
+      - wf-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  wf-network:
+    driver: bridge
