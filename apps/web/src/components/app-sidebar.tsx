@@ -12,6 +12,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { UsageMeterCompact } from '@/components/usage-meter';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -79,8 +80,9 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-4">
-        <p className="text-xs text-muted-foreground">
+      <div className="border-t p-4 space-y-3">
+        <UsageMeterCompact />
+        <p className="text-xs text-muted-foreground text-center">
           © 2026 WF Platform
         </p>
       </div>
