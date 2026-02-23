@@ -5,6 +5,7 @@ import { db, users } from '@wf/db';
 import { eq } from 'drizzle-orm';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppHeader } from '@/components/app-header';
+import { StoreHydrator } from '@/components/store-hydrator';
 
 /**
  * App Shell Layout
@@ -55,30 +56,49 @@ export default async function AppLayout({
 
   // Get tenant info from headers (injected by middleware)
   const headersList = await headers();
+  const tenantId = headersList.get('X-Tenant-Id') || '';
+  const tenantSlug = headersList.get('X-Tenant-Slug') || '';
   const tenantName = headersList.get('X-Tenant-Name') || 'WF Platform';
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <AppSidebar />
+    <>
+      {/* Hydrate client stores with server data */}
+      <StoreHydrator
+        user={{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatarUrl,
+        }}
+        tenant={{
+          id: tenantId,
+          slug: tenantSlug,
+          name: tenantName,
+        }}
+      />
 
-      {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <AppHeader
-          user={{
-            name: user.name,
-            email: user.email,
-            avatarUrl: user.avatarUrl,
-          }}
-          tenantName={tenantName}
-        />
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <AppSidebar />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-muted/30 p-6">
-          {children}
-        </main>
+        {/* Main content area */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Header */}
+          <AppHeader
+            user={{
+              name: user.name,
+              email: user.email,
+              avatarUrl: user.avatarUrl,
+            }}
+            tenantName={tenantName}
+          />
+
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto bg-muted/30 p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
