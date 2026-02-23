@@ -33,6 +33,9 @@ importers:
       '@wf/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@wf/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@wf/shared':
         specifier: workspace:*
         version: link:../../packages/shared
