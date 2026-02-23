@@ -6,6 +6,7 @@ export * from './stripe/types';
 export * from './stripe/plan-sync';
 export * from './stripe/tenant-provisioning';
 export * from './stripe/webhook-handler';
+export * from './stripe/seat-manager';
 export * from './entitlements/check-entitlements';
 export * from './entitlements/features';
 export * from './credits/credit-manager';

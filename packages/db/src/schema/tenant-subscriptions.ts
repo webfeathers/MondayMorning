@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 import { tenants } from './tenants';
 import { plans } from './plans';
 
@@ -18,3 +19,14 @@ export const tenantSubscriptions = pgTable('tenant_subscriptions', {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 });
+
+export const tenantSubscriptionsRelations = relations(tenantSubscriptions, ({ one }) => ({
+  plan: one(plans, {
+    fields: [tenantSubscriptions.planId],
+    references: [plans.id],
+  }),
+  tenant: one(tenants, {
+    fields: [tenantSubscriptions.tenantId],
+    references: [tenants.id],
+  }),
+}));
