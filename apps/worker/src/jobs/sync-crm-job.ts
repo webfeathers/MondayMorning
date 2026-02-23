@@ -35,6 +35,7 @@ import * as schema from '@wf/db/src/schema';
 import { eq, and } from 'drizzle-orm';
 import type { FieldMapping, StageMapping } from '@wf/integrations';
 import type { JobHandler } from '../processor/job-processor';
+import { getCircuitBreaker, CircuitBreakerOpenError } from '../processor/circuit-breaker';
 
 /**
  * Job payload interface
@@ -147,13 +148,30 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
     const adapter = getAdapter(connection.providerName, connection.credentials);
     console.log(`[Job ${jobId}] Created adapter for ${connection.providerName}`);
 
-    // Step 3: Test connection health
-    const isHealthy = await adapter.testConnection();
-    if (!isHealthy) {
-      throw new Error(`Connection test failed for ${connection.providerName}`);
+    // Step 3: Get circuit breaker for this provider
+    const circuitBreakerName = `crm:${connection.providerName}`;
+    const circuitBreaker = getCircuitBreaker(circuitBreakerName);
+    console.log(
+      `[Job ${jobId}] Circuit breaker state: ${circuitBreaker.getState()}`
+    );
+
+    // Step 4: Test connection health (with circuit breaker protection)
+    try {
+      const isHealthy = await circuitBreaker.execute(() => adapter.testConnection());
+      if (!isHealthy) {
+        throw new Error(`Connection test failed for ${connection.providerName}`);
+      }
+    } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        throw new Error(
+          `Circuit breaker is OPEN for ${connection.providerName}. ` +
+          `Service may be down or experiencing issues. Will retry later.`
+        );
+      }
+      throw error;
     }
 
-    // Step 4: Fetch stage mappings from database
+    // Step 5: Fetch stage mappings from database
     const client = await createClient();
     const db = drizzle(client, { schema });
 
@@ -177,7 +195,7 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
 
     console.log(`[Job ${jobId}] Found ${stageMappingsFormatted.length} stage mappings`);
 
-    // Step 5: Sync each entity type
+    // Step 6: Sync each entity type (with circuit breaker protection)
     const results: SyncCRMResult['results'] = [];
 
     for (const entity of entities) {
@@ -191,54 +209,73 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
 
       let result: SyncEngineResult;
 
-      switch (entity) {
-        case 'deals':
-          result = await syncDeals(
-            tenantId,
-            adapter,
-            connectionId,
-            connection.providerName,
-            DEFAULT_DEAL_FIELD_MAPPINGS,
-            stageMappingsFormatted,
-            syncOptions
-          );
-          break;
+      // Wrap sync operations in circuit breaker
+      try {
+        switch (entity) {
+          case 'deals':
+            result = await circuitBreaker.execute(() =>
+              syncDeals(
+                tenantId,
+                adapter,
+                connectionId,
+                connection.providerName,
+                DEFAULT_DEAL_FIELD_MAPPINGS,
+                stageMappingsFormatted,
+                syncOptions
+              )
+            );
+            break;
 
-        case 'accounts':
-          result = await syncAccounts(
-            tenantId,
-            adapter,
-            connectionId,
-            connection.providerName,
-            DEFAULT_ACCOUNT_FIELD_MAPPINGS,
-            syncOptions
-          );
-          break;
+          case 'accounts':
+            result = await circuitBreaker.execute(() =>
+              syncAccounts(
+                tenantId,
+                adapter,
+                connectionId,
+                connection.providerName,
+                DEFAULT_ACCOUNT_FIELD_MAPPINGS,
+                syncOptions
+              )
+            );
+            break;
 
-        case 'contacts':
-          result = await syncContacts(
-            tenantId,
-            adapter,
-            connectionId,
-            connection.providerName,
-            DEFAULT_CONTACT_FIELD_MAPPINGS,
-            syncOptions
-          );
-          break;
+          case 'contacts':
+            result = await circuitBreaker.execute(() =>
+              syncContacts(
+                tenantId,
+                adapter,
+                connectionId,
+                connection.providerName,
+                DEFAULT_CONTACT_FIELD_MAPPINGS,
+                syncOptions
+              )
+            );
+            break;
 
-        case 'tickets':
-          result = await syncTickets(
-            tenantId,
-            adapter,
-            connectionId,
-            connection.providerName,
-            DEFAULT_TICKET_FIELD_MAPPINGS,
-            syncOptions
-          );
-          break;
+          case 'tickets':
+            result = await circuitBreaker.execute(() =>
+              syncTickets(
+                tenantId,
+                adapter,
+                connectionId,
+                connection.providerName,
+                DEFAULT_TICKET_FIELD_MAPPINGS,
+                syncOptions
+              )
+            );
+            break;
 
-        default:
-          throw new Error(`Unknown entity type: ${entity}`);
+          default:
+            throw new Error(`Unknown entity type: ${entity}`);
+        }
+      } catch (error) {
+        if (error instanceof CircuitBreakerOpenError) {
+          throw new Error(
+            `Circuit breaker is OPEN for ${connection.providerName} during ${entity} sync. ` +
+            `Service may be experiencing issues. Job will be retried later.`
+          );
+        }
+        throw error;
       }
 
       results.push({
@@ -260,7 +297,7 @@ export const syncCRMJobHandler: JobHandler = async (context, payload) => {
       );
     }
 
-    // Step 6: Update connection sync state
+    // Step 7: Update connection sync state
     await db
       .update(schema.integrationConnections)
       .set({

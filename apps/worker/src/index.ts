@@ -5,6 +5,7 @@ import { startProcessor, stopProcessor, registerJobHandler } from './processor/j
 import { startScheduler, stopScheduler } from './scheduler/job-scheduler';
 import { startStallDetection, stopStallDetection } from './processor/stall-detection';
 import { syncCRMJobHandler } from './jobs/sync-crm-job';
+import { circuitBreakerRegistry } from './processor/circuit-breaker';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@wf/db';
@@ -29,7 +30,7 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-// Metrics endpoint (placeholder for now)
+// Metrics endpoint
 app.get('/metrics', (req: Request, res: Response) => {
   res.json({
     jobs: {
@@ -38,6 +39,7 @@ app.get('/metrics', (req: Request, res: Response) => {
       completed: 0,
       failed: 0,
     },
+    circuitBreakers: circuitBreakerRegistry.getAllMetrics(),
   });
 });
 
