@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { SearchTrigger } from '@/components/global-search';
 
 interface AppHeaderProps {
   user: {
@@ -37,6 +38,11 @@ export function AppHeader({ user, tenantName }: AppHeaderProps) {
         <h2 className="text-lg font-semibold text-muted-foreground">
           {tenantName}
         </h2>
+      </div>
+
+      {/* Center - Search */}
+      <div className="flex-1 max-w-md mx-auto">
+        <SearchTrigger />
       </div>
 
       {/* Right side - User menu */}

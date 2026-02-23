@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppHeader } from '@/components/app-header';
 import { StoreHydrator } from '@/components/store-hydrator';
+import { GlobalSearch } from '@/components/global-search';
 
 /**
  * App Shell Layout
@@ -76,6 +77,9 @@ export default async function AppLayout({
           name: tenantName,
         }}
       />
+
+      {/* Global Search - mounted globally for keyboard shortcuts */}
+      <GlobalSearch />
 
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
