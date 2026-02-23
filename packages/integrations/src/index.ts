@@ -30,3 +30,6 @@ export type {
   // Webhooks
   WebhookRegistration,
 } from './types/sync-types';
+
+// Adapters
+export { MockCRMAdapter } from './adapters/mock-crm-adapter';
