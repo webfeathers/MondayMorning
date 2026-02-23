@@ -86,4 +86,8 @@ export {
 export {
   getProviderType,
   getAdapter,
+  registerProvider,
+  listProviders,
+  getProviderMetadata,
 } from './core/provider-registry';
+export type { ProviderMetadata } from './core/provider-registry';
