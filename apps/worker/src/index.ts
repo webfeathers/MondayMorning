@@ -2,6 +2,10 @@ import express, { Request, Response } from 'express';
 import { hostname } from 'os';
 import { randomUUID } from 'crypto';
 import { startProcessor, stopProcessor } from './processor/job-processor';
+import { startScheduler, stopScheduler } from './scheduler/job-scheduler';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from '@wf/db';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -42,22 +46,46 @@ const server = app.listen(PORT, () => {
   console.log(`Health check available at http://localhost:${PORT}/health`);
 });
 
+// Initialize database connection
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('DATABASE_URL environment variable is required');
+  process.exit(1);
+}
+const sql = postgres(connectionString);
+const db = drizzle(sql, { schema });
+console.log('Database connection established');
+
 // Start job processor
 const processor = startProcessor(WORKER_ID, 1000);
 console.log('Job processor initialized and started');
+
+// Start job scheduler (check every minute by default)
+const checkInterval = process.env.SCHEDULER_CHECK_INTERVAL
+  ? parseInt(process.env.SCHEDULER_CHECK_INTERVAL)
+  : 60000;
+startScheduler(db, checkInterval);
+console.log(`Job scheduler started (checking every ${checkInterval}ms)`);
 
 // Graceful shutdown handling
 const gracefulShutdown = (signal: string) => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
 
-  // Stop job processor first
+  // Stop job scheduler first
+  console.log('Stopping job scheduler...');
+  stopScheduler();
+
+  // Stop job processor
   console.log('Stopping job processor...');
   stopProcessor();
 
-  server.close(() => {
+  server.close(async () => {
     console.log('HTTP server closed');
 
-    // TODO: Close database connections when implemented
+    // Close database connection
+    console.log('Closing database connection...');
+    await sql.end();
+    console.log('Database connection closed');
 
     console.log('Graceful shutdown complete');
     process.exit(0);

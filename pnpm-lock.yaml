@@ -118,9 +118,15 @@ importers:
       cron-parser:
         specifier: ^5.5.0
         version: 5.5.0
+      drizzle-orm:
+        specifier: ^0.38.0
+        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
       express:
         specifier: ^4.21.2
         version: 4.22.1
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.8
     devDependencies:
       '@types/express':
         specifier: ^5.0.0

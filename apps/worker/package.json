@@ -15,7 +15,9 @@
     "@wf/integrations": "workspace:*",
     "@wf/shared": "workspace:*",
     "cron-parser": "^5.5.0",
-    "express": "^4.21.2"
+    "drizzle-orm": "^0.38.0",
+    "express": "^4.21.2",
+    "postgres": "^3.4.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
