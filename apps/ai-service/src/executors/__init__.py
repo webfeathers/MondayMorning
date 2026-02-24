@@ -1,5 +1,6 @@
 """Executor interfaces and implementations for AI crews."""
 
+from src.executors.crewai_executor import CrewAIExecutor
 from src.executors.exceptions import (
     ContextDataError,
     CrewConfigurationError,
@@ -23,6 +24,8 @@ __all__ = [
     "ExecutionResult",
     "ExecutionStatus",
     "TokenUsage",
+    # Implementations
+    "CrewAIExecutor",
     # Exceptions
     "ExecutionError",
     "ValidationError",
