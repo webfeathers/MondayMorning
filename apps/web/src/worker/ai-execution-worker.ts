@@ -11,6 +11,8 @@ import { db } from '@wf/db';
 import { aiExecutions, aiExecutionJobs } from '@wf/db';
 import { eq, and } from 'drizzle-orm';
 import { notifyExecutionComplete } from '@/lib/notifications/ai-execution-notifier';
+import { trackUsage, trackFailure } from '@/lib/ai/usage-tracker';
+import { deductCredits } from '@/lib/billing/credits';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
@@ -123,6 +125,32 @@ async function processJob(jobId: string) {
       })
       .where(eq(aiExecutionJobs.id, jobId));
 
+    // Track usage for analytics and billing
+    if (result.token_usage) {
+      await trackUsage({
+        tenantId: execution.tenantId,
+        userId: execution.userId,
+        executionId: execution.id,
+        crewTemplateId: execution.crewTemplateId,
+        entityType: execution.entityType || undefined,
+        entityId: execution.entityId || undefined,
+        modelName: result.model_name || 'unknown',
+        tokenUsage: result.token_usage,
+        executionTimeSeconds: result.execution_time_seconds,
+        status: result.status === 'completed' ? 'completed' : 'failed',
+        errorMessage: result.error_message || undefined,
+        metadata: {
+          jobId: jobId,
+          attempts: (job.attempts || 0) + 1,
+        },
+      });
+
+      // Deduct credits from tenant's balance
+      if (result.credits_consumed && result.credits_consumed > 0) {
+        await deductCredits(execution.tenantId, result.credits_consumed);
+      }
+    }
+
     // Send completion notification
     await notifyExecutionComplete({
       executionId: execution.id,
@@ -172,6 +200,24 @@ async function processJob(jobId: string) {
           },
         })
         .where(eq(aiExecutions.id, execution.id));
+
+      // Track failed execution (no tokens consumed)
+      await trackFailure({
+        tenantId: execution.tenantId,
+        userId: execution.userId,
+        executionId: execution.id,
+        crewTemplateId: execution.crewTemplateId,
+        entityType: execution.entityType || undefined,
+        entityId: execution.entityId || undefined,
+        modelName: 'unknown',
+        executionTimeSeconds: undefined,
+        errorMessage: error.message,
+        metadata: {
+          jobId: jobId,
+          attempts: newAttempts,
+          failedAfterRetries: true,
+        },
+      });
 
       // Send failure notification
       await notifyExecutionComplete({

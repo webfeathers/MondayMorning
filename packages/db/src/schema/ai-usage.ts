@@ -1,16 +1,47 @@
-import { pgTable, uuid, text, integer, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, numeric, timestamp, jsonb } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants';
-import { crewTemplates } from './crew-templates';
+import { users } from './users';
+import { aiExecutions } from './ai-executions';
 
+/**
+ * AI usage tracking table for analytics and billing.
+ * Records every AI API call with token usage, cost, and performance metrics.
+ */
 export const aiUsage = pgTable('ai_usage', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
-  crewTemplateId: uuid('crew_template_id').references(() => crewTemplates.id),
-  jobId: uuid('job_id'), // references jobs.id but avoiding circular dependency
-  model: text('model').notNull(),
-  inputTokens: integer('input_tokens').notNull().default(0),
-  outputTokens: integer('output_tokens').notNull().default(0),
-  creditsUsed: numeric('credits_used').notNull().default('0'),
-  executionTimeMs: integer('execution_time_ms'),
+
+  // References
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  executionId: uuid('execution_id').references(() => aiExecutions.id, { onDelete: 'set null' }),
+
+  // Crew details
+  crewTemplateId: text('crew_template_id').notNull(), // e.g., 'account_health'
+  entityType: text('entity_type'), // e.g., 'account', 'deal'
+  entityId: text('entity_id'),
+
+  // Model and tokens
+  modelName: text('model_name').notNull(), // e.g., 'claude-sonnet-4-20250514'
+  promptTokens: integer('prompt_tokens').notNull().default(0),
+  completionTokens: integer('completion_tokens').notNull().default(0),
+  totalTokens: integer('total_tokens').notNull().default(0),
+
+  // Cost and credits
+  estimatedCostUsd: numeric('estimated_cost_usd', { precision: 10, scale: 6 }), // Actual USD cost estimate
+  creditsConsumed: integer('credits_consumed').notNull().default(0), // Platform credits used
+
+  // Performance
+  executionTimeSeconds: integer('execution_time_seconds'),
+
+  // Status
+  status: text('status').notNull().default('completed'), // completed, failed, partial
+  errorMessage: text('error_message'),
+
+  // Additional context
+  metadata: jsonb('metadata'), // Additional tracking data
+
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 });
+
+export type AiUsage = typeof aiUsage.$inferSelect;
+export type NewAiUsage = typeof aiUsage.$inferInsert;
