@@ -8,6 +8,7 @@
     "start": "next start",
     "worker": "tsx src/worker/ai-execution-worker.ts",
     "worker:dev": "tsx watch src/worker/ai-execution-worker.ts",
+    "test:execution": "tsx src/worker/test-execution.ts",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest"
