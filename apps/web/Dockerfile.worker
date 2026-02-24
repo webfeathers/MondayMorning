@@ -1,0 +1,64 @@
+# Dockerfile for Worker service
+# Runs background jobs for AI execution
+
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Stage 1: Install dependencies
+FROM base AS deps
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/db/package.json ./packages/db/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/billing/package.json ./packages/billing/
+COPY packages/integrations/package.json ./packages/integrations/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/observability/package.json ./packages/observability/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Stage 2: Build
+FROM base AS builder
+WORKDIR /app
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+
+# Copy all source
+COPY . .
+
+# Build packages that worker depends on
+RUN pnpm turbo build --filter=@wf/db --filter=@wf/shared --filter=@wf/observability
+
+# Stage 3: Production
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Create non-root user
+RUN addgroup --system --gid 1001 worker
+RUN adduser --system --uid 1001 worker
+
+# Copy built packages and source
+COPY --from=builder --chown=worker:worker /app/node_modules ./node_modules
+COPY --from=builder --chown=worker:worker /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=builder --chown=worker:worker /app/packages ./packages
+COPY --from=builder --chown=worker:worker /app/apps/web/src ./apps/web/src
+COPY --from=builder --chown=worker:worker /app/apps/web/package.json ./apps/web/
+COPY --from=builder --chown=worker:worker /app/apps/web/tsconfig.json ./apps/web/
+
+USER worker
+
+# Health check (worker doesn't have HTTP endpoint, so just check process)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD pgrep -f "ai-execution-worker" || exit 1
+
+# Run worker with tsx for TypeScript support
+CMD ["pnpm", "--filter", "@wf/web", "tsx", "src/worker/ai-execution-worker.ts"]
