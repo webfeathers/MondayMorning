@@ -9,6 +9,7 @@ import {
   Handshake,
   Ticket,
   Users,
+  Brain,
   Settings,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Deals', href: '/deals', icon: Handshake },
   { name: 'Tickets', href: '/tickets', icon: Ticket },
   { name: 'Contacts', href: '/contacts', icon: Users },
+  { name: 'Analyses', href: '/analyses', icon: Brain },
 ];
 
 const secondaryNavigation = [
