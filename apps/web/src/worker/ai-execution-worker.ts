@@ -10,6 +10,7 @@
 import { db } from '@wf/db';
 import { aiExecutions, aiExecutionJobs } from '@wf/db';
 import { eq, and } from 'drizzle-orm';
+import { notifyExecutionComplete } from '@/lib/notifications/ai-execution-notifier';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
@@ -122,6 +123,18 @@ async function processJob(jobId: string) {
       })
       .where(eq(aiExecutionJobs.id, jobId));
 
+    // Send completion notification
+    await notifyExecutionComplete({
+      executionId: execution.id,
+      tenantId: execution.tenantId,
+      userId: execution.userId,
+      status: result.status,
+      crewTemplateId: execution.crewTemplateId,
+      entityType: execution.entityType,
+      entityId: execution.entityId,
+      errorMessage: result.error_message,
+    });
+
     console.log(`Job ${jobId} completed successfully`);
   } catch (error: any) {
     console.error(`Job ${jobId} failed:`, error);
@@ -159,6 +172,18 @@ async function processJob(jobId: string) {
           },
         })
         .where(eq(aiExecutions.id, execution.id));
+
+      // Send failure notification
+      await notifyExecutionComplete({
+        executionId: execution.id,
+        tenantId: execution.tenantId,
+        userId: execution.userId,
+        status: 'failed',
+        crewTemplateId: execution.crewTemplateId,
+        entityType: execution.entityType,
+        entityId: execution.entityId,
+        errorMessage: error.message,
+      });
     }
   }
 }
