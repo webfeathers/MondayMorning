@@ -64,81 +64,81 @@ export async function assembleAccountHealthContext(
     maxRecordsPerType = 1000,
   } = options;
 
-  // Fetch account data
-  const accounts = await db.query.accounts.findMany({
-    where: (accounts, { eq, and }) =>
-      and(eq(accounts.id, accountId), eq(accounts.tenantId, tenantId)),
+  // Fetch organization data
+  const organizations = await db.query.organizations.findMany({
+    where: (organizations, { eq, and }) =>
+      and(eq(organizations.id, accountId), eq(organizations.tenantId, tenantId)),
     limit: 1,
   });
 
-  if (!accounts || accounts.length === 0) {
-    throw new Error(`Account ${accountId} not found`);
+  if (!organizations || organizations.length === 0) {
+    throw new Error(`Organization ${accountId} not found`);
   }
 
   // Fetch related contacts
   const contacts = await db.query.contacts.findMany({
     where: (contacts, { eq, and }) =>
-      and(eq(contacts.accountId, accountId), eq(contacts.tenantId, tenantId)),
+      and(eq(contacts.organizationId, accountId), eq(contacts.tenantId, tenantId)),
     limit: maxRecordsPerType,
   });
 
   // Fetch related deals
   const deals = await db.query.deals.findMany({
     where: (deals, { eq, and }) =>
-      and(eq(deals.accountId, accountId), eq(deals.tenantId, tenantId)),
+      and(eq(deals.organizationId, accountId), eq(deals.tenantId, tenantId)),
     limit: maxRecordsPerType,
   });
 
   // Fetch related tickets
   const tickets = await db.query.tickets.findMany({
     where: (tickets, { eq, and }) =>
-      and(eq(tickets.accountId, accountId), eq(tickets.tenantId, tenantId)),
+      and(eq(tickets.organizationId, accountId), eq(tickets.tenantId, tenantId)),
     limit: maxRecordsPerType,
   });
 
   // Build initial context data
   const contextData: ContextData = {
-    accounts: accounts.map((account) => ({
-      id: account.id,
-      name: account.name,
-      industry: account.industry,
-      status: account.status,
-      employeeCount: account.employeeCount,
-      annualRevenue: account.annualRevenue,
-      createdAt: account.createdAt,
-      updatedAt: account.updatedAt,
+    accounts: organizations.map((organization) => ({
+      id: organization.id,
+      name: organization.name,
+      industry: organization.industry || undefined,
+      status: undefined,
+      employeeCount: organization.employeeCount || undefined,
+      annualRevenue: organization.annualRevenue || undefined,
+      createdAt: organization.createdAt,
+      updatedAt: organization.updatedAt,
     })),
     contacts: contacts.map((contact) => ({
       id: contact.id,
-      accountId: contact.accountId,
-      name: contact.name,
-      email: contact.email,
-      title: contact.title,
-      isPrimary: contact.isPrimary,
-      isActive: contact.isActive,
+      accountId: contact.organizationId || undefined,
+      name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
+      email: contact.email || undefined,
+      title: contact.title || undefined,
+      isPrimary: undefined,
+      isActive: undefined,
       createdAt: contact.createdAt,
     })),
     deals: deals.map((deal) => ({
       id: deal.id,
-      accountId: deal.accountId,
+      accountId: deal.organizationId || undefined,
       name: deal.name,
-      stage: deal.stage,
-      amount: deal.amount,
-      probability: deal.probability,
-      expectedCloseDate: deal.expectedCloseDate,
-      status: deal.status,
+      stage: deal.stage || undefined,
+      amount: deal.amount ? Number(deal.amount) : undefined,
+      probability: deal.probability || undefined,
+      expectedCloseDate: deal.closeDate || undefined,
+      status: undefined,
       createdAt: deal.createdAt,
       updatedAt: deal.updatedAt,
     })),
     tickets: tickets.map((ticket) => ({
       id: ticket.id,
-      accountId: ticket.accountId,
-      title: ticket.title,
-      description: ticket.description,
-      status: ticket.status,
-      priority: ticket.priority,
+      accountId: ticket.organizationId || undefined,
+      title: ticket.subject,
+      description: undefined,
+      status: ticket.status || undefined,
+      priority: ticket.priority || undefined,
       createdAt: ticket.createdAt,
-      resolvedAt: ticket.resolvedAt,
+      resolvedAt: undefined,
     })),
   };
 
@@ -244,20 +244,21 @@ export async function assembleDealContext(
 
   const deal = deals[0];
 
-  // Fetch related account
-  const accounts = deal.accountId
-    ? await db.query.accounts.findMany({
-        where: (accounts, { eq, and }) =>
-          and(eq(accounts.id, deal.accountId), eq(accounts.tenantId, tenantId)),
+  // Fetch related organization
+  const orgId = deal.organizationId;
+  const organizations = orgId
+    ? await db.query.organizations.findMany({
+        where: (organizations, { eq, and }) =>
+          and(eq(organizations.id, orgId), eq(organizations.tenantId, tenantId)),
         limit: 1,
       })
     : [];
 
-  // Fetch related contacts from the account
-  const contacts = deal.accountId
+  // Fetch related contacts from the organization
+  const contacts = orgId
     ? await db.query.contacts.findMany({
         where: (contacts, { eq, and }) =>
-          and(eq(contacts.accountId, deal.accountId), eq(contacts.tenantId, tenantId)),
+          and(eq(contacts.organizationId, orgId), eq(contacts.tenantId, tenantId)),
         limit: maxRecordsPerType,
       })
     : [];
@@ -266,29 +267,29 @@ export async function assembleDealContext(
     deals: [
       {
         id: deal.id,
-        accountId: deal.accountId,
+        accountId: deal.organizationId || undefined,
         name: deal.name,
-        stage: deal.stage,
-        amount: deal.amount,
-        probability: deal.probability,
-        expectedCloseDate: deal.expectedCloseDate,
-        status: deal.status,
+        stage: deal.stage || undefined,
+        amount: deal.amount ? Number(deal.amount) : undefined,
+        probability: deal.probability || undefined,
+        expectedCloseDate: deal.closeDate || undefined,
+        status: undefined,
         createdAt: deal.createdAt,
         updatedAt: deal.updatedAt,
       },
     ],
-    accounts: accounts.map((account) => ({
-      id: account.id,
-      name: account.name,
-      industry: account.industry,
-      status: account.status,
+    accounts: organizations.map((organization) => ({
+      id: organization.id,
+      name: organization.name,
+      industry: organization.industry || undefined,
+      status: undefined,
     })),
     contacts: contacts.map((contact) => ({
       id: contact.id,
-      name: contact.name,
-      email: contact.email,
-      title: contact.title,
-      isPrimary: contact.isPrimary,
+      name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
+      email: contact.email || undefined,
+      title: contact.title || undefined,
+      isPrimary: undefined,
     })),
   };
 
@@ -299,7 +300,7 @@ export async function assembleDealContext(
     metadata: {
       recordCounts: {
         deals: 1,
-        accounts: accounts.length,
+        accounts: organizations.length,
         contacts: contacts.length,
       },
       estimatedTokens,

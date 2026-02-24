@@ -20,6 +20,7 @@ export * from './crew-templates';
 export * from './tenant-crew-overrides';
 export * from './tenant-ai-settings';
 export * from './ai-usage';
+export * from './ai-executions';
 export * from './jobs';
 export * from './job-schedules';
 export * from './notification-rules';

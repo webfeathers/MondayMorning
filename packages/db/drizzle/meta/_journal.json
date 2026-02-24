@@ -29,6 +29,13 @@
       "when": 1771872706409,
       "tag": "0003_harsh_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771906404481,
+      "tag": "0004_wooden_beast",
+      "breakpoints": true
     }
   ]
 }

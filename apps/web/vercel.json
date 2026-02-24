@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../.. && pnpm install && pnpm turbo build --filter=@wf/web",
+  "installCommand": "pnpm install --filter=@wf/web --filter=@wf/db --filter=@wf/shared --filter=@wf/auth --filter=@wf/integrations",
+  "framework": "nextjs",
+  "outputDirectory": ".next"
+}

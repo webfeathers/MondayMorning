@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.health import router as health_router
+from src.api.executions import router as executions_router
 from src.core.config import settings
 
 # Configure logging
@@ -51,6 +52,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router, prefix=settings.api_prefix, tags=["health"])
+app.include_router(executions_router, prefix=f"{settings.api_prefix}/crews", tags=["executions"])
 
 
 @app.get("/")
