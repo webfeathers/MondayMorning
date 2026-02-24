@@ -7,13 +7,23 @@
  * 3. Updates the execution record with results
  */
 
+// Initialize Sentry first
+import './sentry';
+
 import { db } from '@wf/db';
 import { aiExecutions, aiExecutionJobs } from '@wf/db';
 import { eq, and } from 'drizzle-orm';
 import { notifyExecutionComplete } from '@/lib/notifications/ai-execution-notifier';
 import { trackUsage, trackFailure } from '@/lib/ai/usage-tracker';
 import { deductCredits } from '@/lib/billing/credits';
-import { createLogger, createChildLogger, startTimer, log } from '@wf/observability';
+import {
+  createLogger,
+  createChildLogger,
+  startTimer,
+  log,
+  captureException,
+  setSentryTenant,
+} from '@wf/observability';
 
 // Create worker logger
 const logger = createLogger({
@@ -70,6 +80,9 @@ async function processJob(jobId: string) {
     executionLogger.error('Execution not found');
     return;
   }
+
+  // Set Sentry context for error tracking
+  setSentryTenant(job.tenantId);
 
   executionLogger.info('Starting AI crew execution', {
     crewTemplateId: execution.crewTemplateId,
@@ -197,6 +210,18 @@ async function processJob(jobId: string) {
       error: error.message,
       stack: error.stack,
       attempt: (job.attempts || 0) + 1,
+    });
+
+    // Capture error in Sentry
+    captureException(error, {
+      tenantId: job.tenantId,
+      traceId: executionLogger['_context']?.traceId,
+      extra: {
+        jobId,
+        executionId: job.executionId,
+        crewTemplateId: execution.crewTemplateId,
+        attempt: (job.attempts || 0) + 1,
+      },
     });
 
     // Increment attempts

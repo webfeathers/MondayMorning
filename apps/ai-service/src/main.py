@@ -2,16 +2,34 @@
 
 import logging
 import logging.config
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from src.api.health import router as health_router
 from src.api.executions import router as executions_router
 from src.core.config import settings
+
+# Initialize Sentry
+if os.getenv("SENTRY_DSN") and os.getenv("SENTRY_ENABLED") == "true":
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("SENTRY_ENVIRONMENT", settings.environment),
+        release=os.getenv("SENTRY_RELEASE"),
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
+        integrations=[
+            FastApiIntegration(transaction_style="endpoint"),
+            StarletteIntegration(transaction_style="endpoint"),
+        ],
+    )
 
 # Configure structured logging with structlog
 logging.config.dictConfig({
@@ -94,7 +112,7 @@ app.add_middleware(
 # Logging middleware for trace IDs and tenant context
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
-    """Add trace ID and tenant context to all logs."""
+    """Add trace ID and tenant context to all logs and Sentry."""
     # Extract context from headers
     trace_id = request.headers.get("x-trace-id")
     tenant_id = request.headers.get("x-tenant-id")
@@ -104,10 +122,14 @@ async def logging_middleware(request: Request, call_next):
     structlog.contextvars.clear_contextvars()
     if trace_id:
         structlog.contextvars.bind_contextvars(trace_id=trace_id)
+        sentry_sdk.set_tag("trace_id", trace_id)
     if tenant_id:
         structlog.contextvars.bind_contextvars(tenant_id=tenant_id)
+        sentry_sdk.set_tag("tenant_id", tenant_id)
+        sentry_sdk.set_context("tenant", {"id": tenant_id})
     if user_id:
         structlog.contextvars.bind_contextvars(user_id=user_id)
+        sentry_sdk.set_user({"id": user_id})
 
     # Log request
     logger.info(

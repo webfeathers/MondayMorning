@@ -13,6 +13,7 @@ dependencies = [
     "crewai-tools>=0.12.0",
     "python-dotenv>=1.0.0",
     "structlog>=24.1.0",
+    "sentry-sdk[fastapi]>=2.0.0",
 ]
 
 [project.optional-dependencies]
