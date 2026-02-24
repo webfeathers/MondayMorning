@@ -13,6 +13,12 @@ import { eq, and } from 'drizzle-orm';
 import { notifyExecutionComplete } from '@/lib/notifications/ai-execution-notifier';
 import { trackUsage, trackFailure } from '@/lib/ai/usage-tracker';
 import { deductCredits } from '@/lib/billing/credits';
+import { createLogger, createChildLogger, startTimer, log } from '@wf/observability';
+
+// Create worker logger
+const logger = createLogger({
+  base: { service: 'ai-execution-worker' },
+});
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
@@ -36,7 +42,10 @@ interface ExecutionResult {
 }
 
 async function processJob(jobId: string) {
-  console.log(`Processing job ${jobId}...`);
+  const jobLogger = createChildLogger(logger, { jobId });
+  const timer = startTimer('process-job');
+
+  jobLogger.info('Processing job');
 
   // Get job and execution details
   const job = await db.query.aiExecutionJobs.findFirst({
@@ -44,18 +53,28 @@ async function processJob(jobId: string) {
   });
 
   if (!job) {
-    console.error(`Job ${jobId} not found`);
+    jobLogger.error('Job not found');
     return;
   }
+
+  const executionLogger = createChildLogger(jobLogger, {
+    executionId: job.executionId,
+    tenantId: job.tenantId,
+  });
 
   const execution = await db.query.aiExecutions.findFirst({
     where: eq(aiExecutions.id, job.executionId),
   });
 
   if (!execution) {
-    console.error(`Execution ${job.executionId} not found`);
+    executionLogger.error('Execution not found');
     return;
   }
+
+  executionLogger.info('Starting AI crew execution', {
+    crewTemplateId: execution.crewTemplateId,
+    attempt: (job.attempts || 0) + 1,
+  });
 
   try {
     // Update job status to processing
@@ -163,9 +182,22 @@ async function processJob(jobId: string) {
       errorMessage: result.error_message,
     });
 
-    console.log(`Job ${jobId} completed successfully`);
+    const duration = timer.end(executionLogger, {
+      creditsConsumed: result.credits_consumed,
+      status: result.status,
+    });
+    executionLogger.info('Job completed successfully', {
+      creditsConsumed: result.credits_consumed,
+      executionTimeSeconds: result.execution_time_seconds,
+      totalDurationMs: duration,
+    });
   } catch (error: any) {
-    console.error(`Job ${jobId} failed:`, error);
+    timer.end(executionLogger);
+    executionLogger.error('Job failed', {
+      error: error.message,
+      stack: error.stack,
+      attempt: (job.attempts || 0) + 1,
+    });
 
     // Increment attempts
     const newAttempts = (job.attempts || 0) + 1;
@@ -244,7 +276,7 @@ async function pollForJobs() {
     });
 
     if (pendingJobs.length > 0) {
-      console.log(`Found ${pendingJobs.length} pending jobs`);
+      logger.info('Found pending jobs', { count: pendingJobs.length });
 
       // Process jobs sequentially (can be parallelized later)
       for (const job of pendingJobs) {
@@ -252,14 +284,18 @@ async function pollForJobs() {
       }
     }
   } catch (error) {
-    console.error('Error polling for jobs:', error);
+    logger.error('Error polling for jobs', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
   }
 }
 
 async function main() {
-  console.log('AI Execution Worker starting...');
-  console.log(`AI Service URL: ${AI_SERVICE_URL}`);
-  console.log(`Poll interval: ${POLL_INTERVAL_MS}ms`);
+  logger.info('AI Execution Worker starting', {
+    aiServiceUrl: AI_SERVICE_URL,
+    pollIntervalMs: POLL_INTERVAL_MS,
+  });
 
   // Poll for jobs continuously
   while (true) {
@@ -270,16 +306,19 @@ async function main() {
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\nShutting down worker...');
+  logger.info('Shutting down worker (SIGINT)');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nShutting down worker...');
+  logger.info('Shutting down worker (SIGTERM)');
   process.exit(0);
 });
 
 main().catch((error) => {
-  console.error('Fatal error in worker:', error);
+  logger.fatal('Fatal error in worker', {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  });
   process.exit(1);
 });

@@ -1,30 +1,70 @@
 """Main FastAPI application for AI crew execution service."""
 
 import logging
+import logging.config
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+import structlog
 
 from src.api.health import router as health_router
 from src.api.executions import router as executions_router
 from src.core.config import settings
 
-# Configure logging
-logging.basicConfig(
-    level=settings.log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+# Configure structured logging with structlog
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": structlog.stdlib.ProcessorFormatter,
+            "processor": structlog.processors.JSONRenderer(),
+        },
+    },
+    "handlers": {
+        "default": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "root": {
+        "handlers": ["default"],
+        "level": settings.log_level,
+    },
+})
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    context_class=dict,
+    cache_logger_on_first_use=True,
 )
-logger = logging.getLogger(__name__)
+
+logger = structlog.get_logger()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
-    logger.info(f"Starting {settings.service_name} v{settings.service_version}")
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"API prefix: {settings.api_prefix}")
+    logger.info(
+        "Starting AI service",
+        service_name=settings.service_name,
+        version=settings.service_version,
+        environment=settings.environment,
+        api_prefix=settings.api_prefix,
+    )
 
     # Startup
     yield
@@ -49,6 +89,47 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Logging middleware for trace IDs and tenant context
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    """Add trace ID and tenant context to all logs."""
+    # Extract context from headers
+    trace_id = request.headers.get("x-trace-id")
+    tenant_id = request.headers.get("x-tenant-id")
+    user_id = request.headers.get("x-user-id")
+
+    # Bind context to structlog for this request
+    structlog.contextvars.clear_contextvars()
+    if trace_id:
+        structlog.contextvars.bind_contextvars(trace_id=trace_id)
+    if tenant_id:
+        structlog.contextvars.bind_contextvars(tenant_id=tenant_id)
+    if user_id:
+        structlog.contextvars.bind_contextvars(user_id=user_id)
+
+    # Log request
+    logger.info(
+        "HTTP request",
+        method=request.method,
+        path=request.url.path,
+        client_host=request.client.host if request.client else None,
+    )
+
+    # Process request
+    response = await call_next(request)
+
+    # Log response
+    logger.info(
+        "HTTP response",
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+    )
+
+    return response
+
 
 # Include routers
 app.include_router(health_router, prefix=settings.api_prefix, tags=["health"])

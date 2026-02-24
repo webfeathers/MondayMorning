@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractSubdomain, handleMissingTenant, injectTenantHeaders } from './lib/tenant';
+import { generateTraceId } from '@wf/observability';
 
 /**
  * Next.js Middleware for tenant resolution via subdomain
@@ -25,16 +26,23 @@ import { extractSubdomain, handleMissingTenant, injectTenantHeaders } from './li
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host');
 
+  // Generate or extract trace ID for request tracking
+  const traceId = request.headers.get('x-trace-id') || generateTraceId();
+
   if (!host) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-trace-id', traceId);
+    return response;
   }
 
   // Extract subdomain from host
   const subdomain = extractSubdomain(host);
 
-  // If no subdomain, allow request (marketing site)
+  // If no subdomain, allow request (marketing site) but still inject trace ID
   if (!subdomain) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-trace-id', traceId);
+    return response;
   }
 
   // Look up tenant by calling internal API route
@@ -56,19 +64,27 @@ export async function middleware(request: NextRequest) {
 
     const tenant = await response.json();
 
-    // Clone request headers and inject tenant info
+    // Clone request headers and inject tenant info + trace ID
     const requestHeaders = new Headers(request.headers);
     const headersWithTenant = injectTenantHeaders(tenant, requestHeaders);
+    headersWithTenant.set('x-trace-id', traceId);
 
-    // Continue to the app with tenant headers
-    return NextResponse.next({
+    // Create response with updated headers
+    const response = NextResponse.next({
       request: {
         headers: headersWithTenant,
       },
     });
+
+    // Also set trace ID in response headers for client
+    response.headers.set('x-trace-id', traceId);
+
+    return response;
   } catch (error) {
     console.error('Error looking up tenant:', error);
-    return handleMissingTenant(subdomain);
+    const response = handleMissingTenant(subdomain);
+    response.headers.set('x-trace-id', traceId);
+    return response;
   }
 }
 
